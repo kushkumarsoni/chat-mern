@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const connectDB = require('./config/connectDB')
 const dotenv = require('dotenv')
+const cookiesParser = require('cookie-parser')
 
 dotenv.config()
 
@@ -10,6 +11,7 @@ connectDB()
 const app = express()
 app.use(cors())
 app.use(express.json())
+app.use(cookiesParser())
 
 app.get('/',(req,res)=>{
     return res.json({

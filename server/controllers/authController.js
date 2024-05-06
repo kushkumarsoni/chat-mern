@@ -1,5 +1,7 @@
 const UserModel = require("../models/UserModel")
 var bcrypt = require('bcryptjs');
+var jwt = require('jsonwebtoken');
+const { getUserDetailFromToken } = require("../helper/helper");
 
 const registerUser = async (req,res) => {
     try{
@@ -25,10 +27,23 @@ const registerUser = async (req,res) => {
         const user = new UserModel(payload)
         const saveUser = await user.save()
 
-        return res.status(200).json({
+        const tokenData = {
+            id:user._id,
+            email:user.email
+        }
+
+        const token = await jwt.sign(tokenData, process.env.JWT_SECRET_KEY,{expiresIn : '1d'});
+        
+        const cookieOptions = {
+            http:true,
+            secure: true
+        }
+
+        return res.cookie('token',token,cookieOptions).status(200).json({
             status:true,
+            message:'User created successfully!',
             data:saveUser,
-            message:'User created successfully!'
+            token: token
         })
     }catch(error){
         return res.status(200).json({
@@ -50,8 +65,8 @@ const checkEmail = async (req,res) => {
         }
         return res.status(200).json({
             status: true,
+            message: 'User fetch successfully!',
             data: checkEmail,
-            message: 'User fetch successfully!'
         })
     }catch(error){
         return res.status(200).json({
@@ -74,10 +89,99 @@ const checkPassword = async (req,res) => {
                 message: 'Password are wrong .'
             })
         }
+
+        const tokenData = {
+            id:user._id,
+            email:user.email
+        }
+
+        const token = await jwt.sign(tokenData, process.env.JWT_SECRET_KEY,{expiresIn : '1d'});
+        
+        const cookieOptions = {
+            http:true,
+            secure: true
+        }
+
+        return res.cookie('token',token,cookieOptions).status(200).json({
+            status: true,
+            message: 'User fetch successfully!',
+            data: user,
+            token:token
+        })
+    }catch(error){
+        return res.status(200).json({
+            status:false,
+            message:error.message || error
+        })
+    }
+}
+
+
+const getUserDetail = async (req,res) => {
+    try{
+        const token = req.cookies.token || ""
+        const user = await getUserDetailFromToken(token);
         return res.status(200).json({
             status: true,
+            message: 'User fetch successfully!',
             data: user,
-            message: 'User fetch successfully!'
+        })
+    }catch(error){
+        return res.status(200).json({
+            status:false,
+            message:error.message || error
+        })
+    }
+}
+
+const logout = async (req,res) => {
+    try{
+        const cookieOptions = {
+            http:true,
+            secure: true
+        }
+        return res.cookie('token','',cookieOptions).status(200).json({
+            status: true,
+            message: 'logout successfully',
+        })
+    }catch(error){
+        return res.status(200).json({
+            status:false,
+            message:error.message || error
+        })
+    }
+}
+
+const updateUserDetail = async (req,res) => {
+    try{
+       const token = req.cookies.token || ""
+       const user = await getUserDetailFromToken(token);
+        
+        if(!user) {
+            return res.status(200).json({
+                status: false,
+                message: 'User Not found',
+            })
+        }
+        const {name,profile_pic} = req.body
+
+        if(!name) {
+            return res.status(200).json({
+                status:false,
+                message:'Name is required'
+            })
+        }
+
+        const updateUser = await UserModel.updateOne({_id:user._id},{
+            name,
+            profile_pic
+        })
+
+        const userInformation  = await UserModel.findById(user._id).select('-password')
+        return res.status(200).json({
+            status: true,
+            message: 'Profile successfully updated',
+            data: userInformation
         })
     }catch(error){
         return res.status(200).json({
@@ -90,5 +194,8 @@ const checkPassword = async (req,res) => {
 module.exports = {
     registerUser,
     checkEmail,
-    checkPassword
+    checkPassword,
+    getUserDetail,
+    logout,
+    updateUserDetail
 }
